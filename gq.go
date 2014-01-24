@@ -16,12 +16,6 @@ type Statement struct {
 	RowLimit int
 }
 
-type Condition struct {
-	Column string
-	Operator string
-	Value interface{}
-}
-
 type Result struct {
 	Error error
 	SQL string
@@ -39,10 +33,6 @@ func Connect(databaseUrl string) error {
 	return nil
 }
 
-func Equal(column string, value interface{}) *Condition {
-	return &Condition{Column: column, Value: value, Operator: "="}
-}
-
 func From(name string) *Statement {
 	return &Statement{TableName: name}
 }
@@ -52,8 +42,8 @@ func (statement *Statement) Select(columns ...string) *Statement {
 	return statement
 }
 
-func (statement *Statement) Where(condition *Condition) *Statement {
-	statement.Conditions = append(statement.Conditions, condition)
+func (statement *Statement) Where(conditions ...*Condition) *Statement {
+	statement.Conditions = append(statement.Conditions, conditions...)
 	return statement
 }
 
@@ -81,11 +71,20 @@ func (statement *Statement) prepare() *Result {
 	if len(statement.Conditions) > 0 {
 		result.SQL += " WHERE"
 		var placeholder int
-		for _, condition := range statement.Conditions {
-			result.Values = append(result.Values, condition.Value)
-			placeholder++
-			result.SQL += fmt.Sprintf(" (%s %s $%d)",
-				condition.Column, condition.Operator, placeholder)
+		for i, condition := range statement.Conditions {
+			if i > 0 {
+				result.SQL += " AND"
+			}
+
+			if condition.Value == nil {
+				result.SQL += fmt.Sprintf(" (%s %s NULL)",
+					condition.Column, condition.Operator)
+			} else {
+				result.Values = append(result.Values, condition.Value)
+				placeholder++
+				result.SQL += fmt.Sprintf(" (%s %s $%d)",
+					condition.Column, condition.Operator, placeholder)
+			}
 		}
 	}
 
